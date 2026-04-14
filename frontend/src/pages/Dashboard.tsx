@@ -4,6 +4,9 @@ import Sidebar from '../components/Sidebar'
 import BriefingModal from '../components/BriefingModal'
 import { supabase } from '../lib/supabase'
 import { Briefing, Competitor, Workspace } from '../lib/types'
+import { useInstantBriefing } from '../hooks/useInstantBriefing'
+
+const LOADING_LABELS = ['Coletando dados...', 'Analisando com IA...', 'Enviando...']
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -14,6 +17,26 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(Date.now())
   const [toast, setToast] = useState<string | null>(null)
+  const { trigger, status, reset } = useInstantBriefing()
+  const [loadingLabelIdx, setLoadingLabelIdx] = useState(0)
+
+  const isGenerating =
+    status === 'collecting' || status === 'generating' || status === 'delivering'
+
+  useEffect(() => {
+    if (!isGenerating) {
+      setLoadingLabelIdx(0)
+      return
+    }
+    const id = setInterval(() => setLoadingLabelIdx((i) => (i + 1) % LOADING_LABELS.length), 3000)
+    return () => clearInterval(id)
+  }, [isGenerating])
+
+  useEffect(() => {
+    if (status !== 'success') return
+    const id = setTimeout(() => reset(), 5000)
+    return () => clearTimeout(id)
+  }, [status, reset])
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60000)
@@ -83,6 +106,49 @@ export default function Dashboard() {
     if (!latestBriefing) return ''
     return latestBriefing.content_md.split('\n').filter(Boolean).slice(0, 3).join('\n')
   }, [latestBriefing])
+
+  async function handleGenerateNow() {
+    if (!workspace || isGenerating) return
+    const result = await trigger({ workspaceId: workspace.id })
+    if (!result) return
+
+    const { data: briefs } = await supabase
+      .from('briefings')
+      .select('*')
+      .eq('workspace_id', workspace.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    if (briefs && briefs.length > 0) setLatestBriefing(briefs[0] as Briefing)
+
+    if (result.warning) {
+      const missing = [
+        !result.warning.whatsapp ? 'WhatsApp' : null,
+        !result.warning.email ? 'email' : null,
+      ]
+        .filter(Boolean)
+        .join(' e ')
+      setToast(`📊 Relatório gerado, mas houve falha em: ${missing}.`)
+    } else {
+      setToast('📊 Relatório enviado para seu WhatsApp e email!')
+    }
+    setTimeout(() => setToast(null), 5000)
+  }
+
+  const buttonLabel =
+    status === 'success'
+      ? '✅ Relatório enviado!'
+      : status === 'error'
+        ? '❌ Erro — tentar novamente'
+        : isGenerating
+          ? LOADING_LABELS[loadingLabelIdx]
+          : '⚡ Gerar Relatório Agora'
+
+  const buttonBg =
+    status === 'success'
+      ? 'var(--success)'
+      : status === 'error'
+        ? 'var(--danger)'
+        : 'var(--accent)'
 
   if (loading) {
     return (
@@ -164,6 +230,36 @@ export default function Dashboard() {
           <div className="text-muted" style={{ fontSize: 13, marginTop: 4, color: '#a0a0a0' }}>
             Entrega automática todo domingo às 8h no WhatsApp e email
           </div>
+          <button
+            type="button"
+            onClick={handleGenerateNow}
+            disabled={isGenerating}
+            className="btn-primary"
+            style={{
+              marginTop: 20,
+              background: buttonBg,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 10,
+              cursor: isGenerating ? 'not-allowed' : 'pointer',
+              opacity: isGenerating ? 0.9 : 1,
+            }}
+          >
+            {isGenerating && (
+              <span
+                aria-hidden
+                style={{
+                  width: 16,
+                  height: 16,
+                  border: '2px solid rgba(255,255,255,0.4)',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  animation: 'spin 0.8s linear infinite',
+                }}
+              />
+            )}
+            {buttonLabel}
+          </button>
         </div>
 
         {/* Competitors grid */}
