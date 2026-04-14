@@ -93,8 +93,19 @@ Deno.serve(async (req) => {
 
     const workspaceId = competitor.workspace_id as string;
 
-    // 3. Só dispara briefing no domingo
-    if (new Date().getDay() !== 0) {
+    // 3. Busca workspace para verificar dia de entrega configurado
+    const { data: ws, error: wsErr } = await supabase
+      .from("workspaces")
+      .select("report_day_of_week")
+      .eq("id", workspaceId)
+      .single();
+    if (wsErr || !ws) {
+      console.error("workspace lookup failed", wsErr);
+      return ok({ stored: true, briefing_triggered: false });
+    }
+
+    const reportDay = ws.report_day_of_week ?? 0;
+    if (new Date().getDay() !== reportDay) {
       return ok({ stored: true, briefing_triggered: false });
     }
 

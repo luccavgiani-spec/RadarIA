@@ -21,6 +21,10 @@ export default function Settings() {
   const [reportEmail, setReportEmail] = useState('')
   const [deliveryMsg, setDeliveryMsg] = useState<string | null>(null)
 
+  // report day form
+  const [reportDayOfWeek, setReportDayOfWeek] = useState(0)
+  const [reportDayMsg, setReportDayMsg] = useState<string | null>(null)
+
   useEffect(() => {
     ;(async () => {
       const { data: session } = await supabase.auth.getSession()
@@ -43,6 +47,7 @@ export default function Settings() {
       setWorkspace(ws)
       setWhatsapp(ws.whatsapp_number ?? '')
       setReportEmail(ws.report_email ?? '')
+      setReportDayOfWeek(ws.report_day_of_week ?? 0)
       setPlans((plansRes.data ?? []) as Plan[])
 
       const [compsRes, subRes] = await Promise.all([
@@ -120,6 +125,22 @@ export default function Settings() {
     }
     setDeliveryMsg('Salvo com sucesso.')
     setTimeout(() => setDeliveryMsg(null), 2500)
+  }
+
+  async function handleSaveReportDay(e: FormEvent) {
+    e.preventDefault()
+    setReportDayMsg(null)
+    if (!workspace) return
+    const { error } = await supabase
+      .from('workspaces')
+      .update({ report_day_of_week: reportDayOfWeek })
+      .eq('id', workspace.id)
+    if (error) {
+      setReportDayMsg('Erro: ' + error.message)
+      return
+    }
+    setReportDayMsg('Salvo com sucesso.')
+    setTimeout(() => setReportDayMsg(null), 2500)
   }
 
   async function handleCancelSubscription() {
@@ -286,6 +307,40 @@ export default function Settings() {
                 onChange={(e) => setReportEmail(e.target.value)}
                 placeholder="voce@empresa.com.br"
               />
+            </div>
+            <button className="btn-primary">Salvar</button>
+          </form>
+        </section>
+
+        {/* Dia do briefing */}
+        <section className="card" style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: '1.15rem', marginBottom: 4 }}>Dia do briefing</h3>
+          <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>
+            Qual dia da semana você quer receber seu briefing?
+          </p>
+
+          {reportDayMsg && (
+            <div className={reportDayMsg.startsWith('Erro') ? 'error-banner' : 'success-banner'}>
+              {reportDayMsg}
+            </div>
+          )}
+
+          <form onSubmit={handleSaveReportDay}>
+            <div className="form-group">
+              <label className="label">Dia da semana</label>
+              <select
+                className="input"
+                value={reportDayOfWeek}
+                onChange={(e) => setReportDayOfWeek(Number(e.target.value))}
+              >
+                <option value={0}>Domingo</option>
+                <option value={1}>Segunda-feira</option>
+                <option value={2}>Terça-feira</option>
+                <option value={3}>Quarta-feira</option>
+                <option value={4}>Quinta-feira</option>
+                <option value={5}>Sexta-feira</option>
+                <option value={6}>Sábado</option>
+              </select>
             </div>
             <button className="btn-primary">Salvar</button>
           </form>
