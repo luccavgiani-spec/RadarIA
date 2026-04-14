@@ -28,6 +28,33 @@ function json(status: number, body: Record<string, unknown>) {
   });
 }
 
+// Utilitário: disparar um Actor da Apify via API REST
+async function triggerApifyActor(
+  actorId: string,
+  input: object,
+  webhookUrl: string,
+  webhookSecret: string,
+): Promise<void> {
+  const apifyToken = Deno.env.get("APIFY_API_TOKEN");
+  if (!apifyToken) return; // silencioso — não quebrar o briefing se Apify não estiver configurado
+
+  await fetch(
+    `https://api.apify.com/v2/acts/${actorId.replace("/", "~")}/runs`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apifyToken}`,
+      },
+      body: JSON.stringify({
+        ...input,
+        webhookUrl: webhookUrl,
+        webhookHeaders: { "x-webhook-secret": webhookSecret },
+      }),
+    },
+  );
+}
+
 /** Monta um bloco de texto por concorrente, comparando semana atual vs anterior. */
 function buildContext(
   competitors: { id: string; name: string }[],

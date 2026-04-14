@@ -8,6 +8,20 @@
 //
 // Retorna 200 sempre (erros não-críticos viram log) para evitar retentativas da Apify.
 
+/**
+ * APIFY ACTORS CONFIGURADOS PARA O RADARIA (low-cost, sem browser quando possível)
+ *
+ * website    → apify/website-content-crawler  (Cheerio-based, 8-16x mais barato que web-scraper)
+ * instagram  → apify/instagram-scraper
+ * meta_ads   → apify/facebook-ads-scraper
+ * google_maps → compass/crawler-google-places
+ * linkedin_jobs → curious_coder/linkedin-jobs-scraper
+ *
+ * Custo estimado por cliente/mês (3 concorrentes × 5 fontes × 30 dias):
+ * ~$0.15-0.30/mês no plano Free ($5/mês) → suporta até ~15 clientes no free tier
+ * ~$0.15-0.30/mês no Starter ($29/mês) → suporta até ~80 clientes confortavelmente
+ */
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
