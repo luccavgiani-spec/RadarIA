@@ -4,10 +4,6 @@ import Sidebar from '../components/Sidebar'
 import { supabase } from '../lib/supabase'
 import { Workspace } from '../lib/types'
 
-// TODO: checkout integration — Mercado Pago (ou alternativa) será plugado aqui
-// no próximo prompt. A Edge Function `mp-process-payment` já está pronta.
-// Por ora, exibimos apenas os planos e um aviso de "em breve".
-
 interface PlanCard {
   name: string
   key: 'starter' | 'pro'
@@ -21,7 +17,7 @@ const PLANS: PlanCard[] = [
   {
     name: 'Starter',
     key: 'starter',
-    price: 197,
+    price: 39,
     maxComps: 3,
     features: [
       'Até 3 concorrentes',
@@ -34,7 +30,7 @@ const PLANS: PlanCard[] = [
   {
     name: 'Pro',
     key: 'pro',
-    price: 497,
+    price: 97,
     maxComps: 8,
     highlight: true,
     features: [
@@ -52,6 +48,8 @@ export default function Planos() {
   const navigate = useNavigate()
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [loading, setLoading] = useState(true)
+  const [processingPlan, setProcessingPlan] = useState<'starter' | 'pro' | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     ;(async () => {
@@ -74,6 +72,45 @@ export default function Planos() {
     })()
   }, [navigate])
 
+  async function handleAssinar(planName: 'starter' | 'pro') {
+    if (!workspace) return
+    setError(null)
+    setProcessingPlan(planName)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-checkout`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            workspace_id: workspace.id,
+            plan_name: planName,
+            success_url: `${window.location.origin}/dashboard?payment=success`,
+            cancel_url: `${window.location.origin}/planos`,
+          }),
+        },
+      )
+
+      const payload = await res.json()
+      if (payload.error) throw new Error(payload.error)
+      if (!payload.checkout_url) throw new Error('URL de checkout ausente na resposta.')
+
+      // Redireciona para o Stripe Checkout (página hosted pelo Stripe)
+      window.location.href = payload.checkout_url
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+      setError('Erro ao iniciar checkout: ' + msg)
+      setProcessingPlan(null)
+    }
+  }
+
   return (
     <div className="app-shell">
       <Sidebar active="planos" />
@@ -83,20 +120,7 @@ export default function Planos() {
           Escolha o plano que faz sentido para sua operação. Cancele quando quiser.
         </p>
 
-        <div
-          style={{
-            background: '#fef8e8',
-            border: '1px solid #f5dc8a',
-            color: '#8a6d1a',
-            padding: '14px 20px',
-            borderRadius: 'var(--radius)',
-            marginBottom: 24,
-            fontSize: 14,
-          }}
-        >
-          ⚙️ <strong>Checkout em configuração.</strong> Em breve você poderá assinar
-          direto por aqui. Enquanto isso, seu trial segue ativo.
-        </div>
+        {error && <div className="error-banner">{error}</div>}
 
         {loading ? (
           <p className="text-muted">Carregando...</p>
@@ -126,7 +150,7 @@ export default function Planos() {
                 <h3>{p.name}</h3>
                 <div style={{ margin: '16px 0' }}>
                   <span style={{ fontFamily: 'Sora', fontSize: 40, fontWeight: 800 }}>
-                    R$ {p.price}
+                    ${p.price}
                   </span>
                   <span className="text-muted"> / mês</span>
                 </div>
@@ -138,10 +162,12 @@ export default function Planos() {
                 <button
                   className="btn-primary"
                   style={{ width: '100%' }}
-                  disabled
-                  title="Checkout em configuração"
+                  onClick={() => handleAssinar(p.key)}
+                  disabled={processingPlan !== null}
                 >
-                  Em breve
+                  {processingPlan === p.key
+                    ? 'Redirecionando...'
+                    : `Assinar ${p.name}`}
                 </button>
               </div>
             ))}

@@ -13,10 +13,22 @@ export default function Dashboard() {
   const [modalOpen, setModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [now, setNow] = useState(Date.now())
+  const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60000)
     return () => clearInterval(timer)
+  }, [])
+
+  // Detecta retorno do Stripe Checkout
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('payment') === 'success') {
+      window.history.replaceState({}, '', '/dashboard')
+      setToast('🎉 Assinatura ativada com sucesso! Bem-vindo ao RadarIA.')
+      const t = setTimeout(() => setToast(null), 6000)
+      return () => clearTimeout(t)
+    }
   }, [])
 
   useEffect(() => {
@@ -87,6 +99,25 @@ export default function Dashboard() {
     <div className="app-shell">
       <Sidebar active="dashboard" />
       <main className="main-content">
+        {toast && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 24,
+              right: 24,
+              zIndex: 200,
+              background: 'var(--success)',
+              color: '#fff',
+              padding: '14px 20px',
+              borderRadius: 12,
+              boxShadow: 'var(--shadow-md)',
+              fontWeight: 600,
+              maxWidth: 420,
+            }}
+          >
+            {toast}
+          </div>
+        )}
         <h2 style={{ marginBottom: 8 }}>Olá, {workspace?.company_name} 👋</h2>
         <p className="text-muted" style={{ marginBottom: 32 }}>
           Aqui está o radar dos seus concorrentes.

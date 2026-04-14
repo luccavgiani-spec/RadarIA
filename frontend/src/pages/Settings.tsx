@@ -123,14 +123,41 @@ export default function Settings() {
   }
 
   async function handleCancelSubscription() {
-    if (!subscription) return
-    if (!confirm('Tem certeza que quer cancelar sua assinatura?')) return
-    const { error } = await supabase
-      .from('subscriptions')
-      .update({ status: 'cancelled' })
-      .eq('id', subscription.id)
-    if (!error) {
+    if (!subscription || !workspace) return
+    if (
+      !confirm(
+        'Tem certeza que quer cancelar sua assinatura? Você continua com acesso até o final do período pago.',
+      )
+    )
+      return
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-cancel`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ workspace_id: workspace.id }),
+        },
+      )
+
+      const payload = await res.json()
+      if (!res.ok || payload.error) {
+        throw new Error(payload.error ?? 'Falha ao cancelar')
+      }
+
       setSubscription({ ...subscription, status: 'cancelled' })
+      alert('Assinatura agendada para cancelamento ao final do período atual.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+      alert('Erro ao cancelar: ' + msg)
     }
   }
 
