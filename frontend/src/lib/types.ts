@@ -8,6 +8,7 @@ export interface Workspace {
   trial_ends_at: string
   whatsapp_number: string | null
   report_email: string | null
+  report_day_of_week?: number
   created_at: string
 }
 
